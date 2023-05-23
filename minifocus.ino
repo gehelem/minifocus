@@ -5,6 +5,7 @@
 #define MyStepX     2
 #define MyEnable    8
 #define CS_PIN      7
+#define HomePin     9
 //encoder
 #define mult    16
 
@@ -26,13 +27,15 @@ char line[MAXCOMMAND];
 boolean eoc = false;    // end of command
 int idx = 0;    // index into command string
  
-long pos=3000;
+long pos=500;
 bool isEnabled;
- 
+bool isGoingHome = false;
+
 void setup() {
 
   SPI.begin();
   pinMode(CS_PIN, OUTPUT);
+  pinMode(HomePin, INPUT_PULLUP);
   digitalWrite(CS_PIN, HIGH);
   driver.begin();             // Initiate pins and registeries
   driver.rms_current(600);    // Set stepper current to 600mA. The command is the same as command TMC2130.setCurrent(600, 0.11, 0.5);
@@ -65,8 +68,21 @@ void loop() {
       delay(100);
       isEnabled = false;
   }
-
   stepper.run();
+
+  if (isGoingHome) {
+    int val = digitalRead(HomePin);
+    if (val==HIGH)  
+    {
+    } 
+    else 
+    {
+      stepper.setCurrentPosition(0);
+      stepper.disableOutputs();      
+      isGoingHome=false;
+      pos=0;
+    }
+  }
  
   while (Serial.available() && !eoc) {
     inChar = Serial.read();
@@ -152,6 +168,21 @@ void loop() {
       delay(100);      
       isEnabled=true; 
       stepper.moveTo(pos*mult);
+    }
+
+    // --------------------------------------------------------------------------------
+    // handle home command
+    else if (!strcasecmp(cmd, "PH")) {
+    int val = digitalRead(HomePin);
+      if (val==HIGH)  
+      {
+        stepper.setCurrentPosition(65535*mult);
+        stepper.enableOutputs();
+        delay(100);      
+        stepper.moveTo(-65535);
+        isEnabled = true;
+        isGoingHome=true; 
+      }       
     }
 
     // --------------------------------------------------------------------------------
